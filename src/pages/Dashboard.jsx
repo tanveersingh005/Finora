@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { DollarSign, ArrowUpRight, TrendingDown, Eye, Box, Zap, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useMemo, useState } from 'react';
 import { addTransaction } from '../features/transactions/transactionSlice';
@@ -268,10 +269,16 @@ export const Dashboard = () => {
             </div>
           </div>
           
-          <div className="flex-1 w-full relative z-10 min-h-[250px]">
+          <div className="flex-1 w-full relative z-10 min-h-[250px] mb-4">
              <div className="absolute inset-0">
                <ExpenseRadarChart />
              </div>
+          </div>
+
+          <div className="relative z-10 mt-auto flex justify-end border-t border-slate-100 dark:border-white/5 pt-4">
+            <Link to="/insights" className="group flex items-center gap-2 text-sm font-bold text-amber-600 dark:text-amber-400 hover:text-amber-500 transition-colors">
+              Deep Insights <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </Link>
           </div>
         </ModernBentoCard>
       </div>

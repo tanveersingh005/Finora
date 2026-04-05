@@ -37,7 +37,7 @@ export const ParticleBackground = ({ overlayClass = "fixed inset-0" }) => {
   const particleColors =
     theme === "dark"
       ? ["#6366F1", "#8B5CF6", "#22D3EE"]
-      : ["#312E81", "#4C1D95", "#115E59"]; // Deep Indigo, Violet, Teal for Light Mode
+      : ["#1E1B4B", "#3B0764", "#115E59"]; // Extremely dark colors to contrast sharply against light BG
 
   const options = {
     background: {
@@ -76,9 +76,9 @@ export const ParticleBackground = ({ overlayClass = "fixed inset-0" }) => {
 
       links: {
         enable: true,
-        color: theme === "dark" ? "#6366F1" : "#312E81",
+        color: theme === "dark" ? "#6366F1" : "#1E1B4B",
         distance: 140,
-        opacity: theme === "dark" ? 0.15 : 0.4,
+        opacity: theme === "dark" ? 0.15 : 0.6,
         width: 1,
       },
 
@@ -117,9 +117,9 @@ export const ParticleBackground = ({ overlayClass = "fixed inset-0" }) => {
       },
 
       shadow: {
-        enable: true,
-        color: theme === "dark" ? "#818CF8" : "#312E81",
-        blur: theme === "dark" ? 15 : 8,
+        enable: theme === "dark", // Disable harsh shadows in light mode so it blends natively
+        color: theme === "dark" ? "#818CF8" : "transparent",
+        blur: theme === "dark" ? 15 : 0,
       },
     },
 
@@ -135,7 +135,7 @@ export const ParticleBackground = ({ overlayClass = "fixed inset-0" }) => {
         window.tsParticlesContainer = container; // Safely bind the active V3 DOM Container
       }}
       options={options}
-      className={`${overlayClass} z-[1] pointer-events-none opacity-80`}
+      className={`${overlayClass} z-[0] pointer-events-none opacity-80`}
     />
   );
 };

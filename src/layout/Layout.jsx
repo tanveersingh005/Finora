@@ -36,12 +36,11 @@ export const Layout = () => {
         />
       </div>
 
-      {/* Physics Swarm Sprinkles Element */}
       <ParticleBackground />
 
       <Sidebar />
-      {/* Removed z-10 from here so Sidebar (z-20) sits firmly on top and captures clicks */}
-      <div className="flex-1 flex flex-col md:pl-64 min-w-0 transition-all duration-300 w-full relative z-0">
+      {/* Set to z-10 so the core components actively physically overlay the WebGL background */}
+      <div className="flex-1 flex flex-col md:pl-64 min-w-0 transition-all duration-300 w-full relative z-10">
         <Navbar />
         <main className="flex-1 p-6 md:p-10 overflow-y-auto w-full max-w-[1400px] mx-auto z-0">
           <Outlet />

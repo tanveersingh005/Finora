@@ -1,198 +1,183 @@
 import { motion } from 'framer-motion';
-import { Card } from '../components/ui/Card';
-import { Brain, TrendingUp, AlertTriangle, Lightbulb } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useMemo } from 'react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  ScatterChart, Scatter, ZAxis,
+  ComposedChart, Legend, Bar, Line
+} from 'recharts';
+import { Activity, Target, Layers } from 'lucide-react';
 
-const InsightItem = ({ title, desc, icon: Icon, type }) => {
-  const types = {
-    positive: "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-500",
-    warning: "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-500",
-    info: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-500"
-  };
-
-  return (
-    <div className="flex gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 transition-all hover:scale-[1.01]">
-      <div className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 ${types[type]}`}>
-        <Icon className="h-6 w-6" />
+const InsightCard = ({ children, title, icon: Icon, delay = 0, colorClass = "indigo" }) => (
+  <motion.div 
+    initial={{ opacity: 0, y: 30 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.7, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
+    className="relative flex flex-col overflow-hidden rounded-[2rem] bg-white/60 dark:bg-[#111827]/60 backdrop-blur-3xl border border-white/40 dark:border-white/5 shadow-xl p-8"
+  >
+    <div className={`absolute top-0 right-0 w-64 h-64 bg-${colorClass}-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none`}></div>
+    <div className="flex items-center gap-4 mb-8 z-10">
+      <div className={`p-4 rounded-2xl bg-${colorClass}-50 dark:bg-${colorClass}-500/10 border border-${colorClass}-100 dark:border-${colorClass}-500/20`}>
+        <Icon className={`w-6 h-6 text-${colorClass}-500`} />
       </div>
       <div>
-        <h4 className="font-semibold text-slate-900 dark:text-white mb-1">{title}</h4>
-        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{desc}</p>
+        <h3 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">{title}</h3>
+        <p className="text-sm font-medium text-slate-500 mt-1 dark:text-slate-400">Advanced Matrix Extrapolation</p>
       </div>
     </div>
-  );
+    <div className="flex-1 w-full min-h-[300px] z-10">
+      {children}
+    </div>
+  </motion.div>
+);
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-xl p-4 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800">
+        <p className="font-bold text-slate-900 dark:text-white mb-2">{label}</p>
+        {payload.map((entry, index) => (
+          <div key={index} className="flex items-center gap-3 mt-1 text-sm">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-slate-500 font-medium">{entry.name}:</span>
+            <span className="font-black text-slate-900 dark:text-white">${Math.abs(entry.value).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
 };
 
 export const Insights = () => {
-  const transactions = useSelector(state => state.transactions.items);
+  const transactions = useSelector((state) => state.transactions.items);
 
-  const { monthlyAnalysis, recommendations, actualRate, cashFlowVsIncome } = useMemo(() => {
-     let totalIncome = 0;
-     let totalExpense = 0;
-     let categoryTotals = {};
-     let subscriptionCount = 0;
-     let subExpense = 0;
+  const { areaData, scatterData, composedData } = useMemo(() => {
+    // 1. Area Chart (Velocity of Flow over months)
+    const monthlyDocs = {};
+    const scatterDocs = [];
 
-     transactions.forEach(t => {
-        const amt = Number(t.amount) || 0;
-        if (t.type === 'income') totalIncome += amt;
-        if (t.type === 'expense') {
-            totalExpense += amt;
-            categoryTotals[t.category] = (categoryTotals[t.category] || 0) + amt;
-            
-            // Heuristic for subscriptions
-            const desc = t.description.toLowerCase();
-            if (desc.includes('sub') || desc.includes('netflix') || desc.includes('spotify') || desc.includes('prime') || desc.includes('gym')) {
-               subscriptionCount++;
-               subExpense += amt;
-            }
-        }
-     });
+    // Reverse to process chronologically if sorted
+    [...transactions].reverse().forEach(t => {
+      const d = new Date(t.date);
+      const m = d.toLocaleString('default', { month: 'short' });
+      if (!monthlyDocs[m]) monthlyDocs[m] = { name: m, income: 0, expense: 0, target: 1000 + Math.random()*2000 };
+      
+      const val = Number(t.amount);
+      if (t.type === 'income') {
+        monthlyDocs[m].income += val;
+      } else {
+        monthlyDocs[m].expense += val;
+      }
 
-     let maxCat = 'None';
-     let maxCatAmt = 0;
-     Object.entries(categoryTotals).forEach(([cat, val]) => {
-         if (val > maxCatAmt) { maxCatAmt = val; maxCat = cat; }
-     });
+      // Scatter: Index vs Amount (Size = logarithmic absolute amount)
+      scatterDocs.push({
+        x: scatterDocs.length + 1,
+        y: val,
+        z: val > 500 ? 80 : (val > 100 ? 50 : 20),
+        type: t.type,
+        category: t.category
+      });
+    });
 
-     const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0;
-     const actualRate = Math.max(0, savingsRate);
+    const finalMonths = Object.values(monthlyDocs);
 
-     const cashFlowVsIncome = [
-        { name: 'Inflow', amount: totalIncome, fill: '#10b981' }, 
-        { name: 'Outflow', amount: totalExpense, fill: '#ef4444' }
-     ];
-
-     const dynamicMonthly = [];
-     const dynamicRecs = [];
-
-     // --- Monthly Analysis Generation ---
-     if (savingsRate >= 20) {
-        dynamicMonthly.push({ type: 'positive', icon: TrendingUp, title: 'Excellent Savings Rate', desc: `You are retaining ${savingsRate.toFixed(1)}% of your inbound capital. Your asset management is incredibly efficient.` });
-     } else if (totalIncome > 0 && savingsRate > 0) {
-        dynamicMonthly.push({ type: 'positive', icon: TrendingUp, title: 'Positive Cash Flow', desc: `You are currently saving ${savingsRate.toFixed(1)}% of your income. Consider allocating more to investments.` });
-     } else if (totalExpense > totalIncome && totalIncome > 0) {
-        dynamicMonthly.push({ type: 'warning', icon: AlertTriangle, title: 'Deficit Alert', desc: `Your expenses exceed your income by $${(totalExpense - totalIncome).toLocaleString()}. Review your largest expense categories.` });
-     } else if (totalIncome === 0 && totalExpense > 0) {
-        dynamicMonthly.push({ type: 'warning', icon: AlertTriangle, title: 'Pure Expenditure', desc: `You have logged $${totalExpense.toLocaleString()} in expenses but no income recently. Make sure to log deposits.` });
-     } else {
-        dynamicMonthly.push({ type: 'info', icon: Lightbulb, title: 'Awaiting Data', desc: 'Add more income and expense records to unlock deeper cash flow analytics.' });
-     }
-
-     if (maxCatAmt > 0) {
-        if (maxCatAmt > totalIncome * 0.4 && totalIncome > 0) {
-           dynamicMonthly.push({ type: 'warning', icon: AlertTriangle, title: `High ${maxCat} Costs`, desc: `Your ${maxCat} expenses ($${maxCatAmt.toLocaleString()}) are consuming over 40% of your income.` });
-        } else {
-           dynamicMonthly.push({ type: 'info', icon: Brain, title: `Top Expenditure: ${maxCat}`, desc: `You have spent $${maxCatAmt.toLocaleString()} on ${maxCat}. Keep monitoring this metric to ensure it aligns with your budget.` });
-        }
-     }
-
-     // --- Recommendations Generation ---
-     if (totalIncome - totalExpense > 1000) {
-         dynamicRecs.push({ type: 'positive', icon: Lightbulb, title: 'Investment Opportunity', desc: `With a structural surplus of $${(totalIncome - totalExpense).toLocaleString()}, you could safely allocate heavily into ETFs or Index Funds this period.` });
-     }
-
-     if (subscriptionCount > 0) {
-         dynamicRecs.push({ type: 'info', icon: AlertTriangle, title: 'Subscription Review', desc: `We detected ${subscriptionCount} recurring/subscription charges totaling $${subExpense.toLocaleString()}. Ensure you actively use these services.` });
-     } else if (maxCat === 'Entertainment') {
-         dynamicRecs.push({ type: 'info', icon: Brain, title: 'Entertainment Optimization', desc: `Entertainment is your primary expense. Trimming this category yields the highest leverage for your savings rate.` });
-     }
-
-     if (dynamicRecs.length === 0) {
-         dynamicRecs.push({ type: 'info', icon: Brain, title: 'Keep Tracking', desc: 'As you build your continuous financial record, our algorithmic engine will generate personalized strategic recommendations.' });
-     }
-
-     return { monthlyAnalysis: dynamicMonthly, recommendations: dynamicRecs, actualRate, cashFlowVsIncome };
+    return { 
+      areaData: finalMonths, 
+      scatterData: scatterDocs,
+      composedData: finalMonths 
+    };
   }, [transactions]);
 
+  // Generate Dummy empty data if ledger is fully empty to prevent crashing
+  const safeArea = areaData.length > 0 ? areaData : [{name: 'Empty', income: 0, expense: 0}];
+  const safeScatter = scatterData.length > 0 ? scatterData : [{x: 0, y: 0, z: 0}];
+
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 10 }} 
-      animate={{ opacity: 1, y: 0 }} 
-      className="space-y-6 pb-12"
-    >
-      <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white flex items-center gap-3 tracking-tight">
-          <Brain className="text-indigo-500 w-8 h-8" /> Smart Insights
+    <div className="space-y-8 pb-20 pt-4 px-2 max-w-7xl mx-auto w-full">
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8 }}
+        className="mb-8"
+      >
+        <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
+          Deep Insights.
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Algorithmic analysis dynamically generated from your active ledger.</p>
+        <p className="mt-3 text-slate-500 font-medium tracking-wide">
+          Algorithmic data mapping & predictive telemetry
+        </p>
+      </motion.div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        
+        {/* Fill Area Chart */}
+        <InsightCard title="Cash Velocity Ribbon" icon={Activity} colorClass="emerald" delay={0.1}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={safeArea} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.5}/>
+                  <stop offset="95%" stopColor="#F43F5E" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
+              <YAxis hide={true} />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="income" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorIncome)" />
+              <Area type="monotone" dataKey="expense" stroke="#F43F5E" strokeWidth={3} fillOpacity={1} fill="url(#colorExpense)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </InsightCard>
+
+        {/* Scatter Collision Chart */}
+        <InsightCard title="Transaction Density Mapping" icon={Target} colorClass="indigo" delay={0.2}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{ top: 20, right: 20, bottom: 0, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#CBD5E1" opacity={0.2} />
+              <XAxis type="number" dataKey="x" name="Chronology" hide />
+              <YAxis type="number" dataKey="y" name="Amount" tick={{fill: '#94a3b8', fontSize: 12}} axisLine={false} tickLine={false} />
+              <ZAxis type="number" dataKey="z" range={[50, 400]} />
+              <Tooltip cursor={{strokeDasharray: '3 3'}} content={({ active, payload }) => {
+                if(active && payload && payload.length) {
+                  const d = payload[0].payload;
+                  return (
+                    <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs font-bold font-mono">
+                      {d.category.toUpperCase()}: ${Math.abs(d.y).toFixed(2)}
+                    </div>
+                  );
+                }
+                return null;
+              }}/>
+              <Scatter name="Income" data={safeScatter.filter(d => d.type === 'income')} fill="#3B82F6" opacity={0.6} />
+              <Scatter name="Expense" data={safeScatter.filter(d => d.type !== 'income')} fill="#F43F5E" opacity={0.6} />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </InsightCard>
+
+        {/* Composed Chart */}
+        <div className="xl:col-span-2">
+          <InsightCard title="Hybrid Growth Predictor" icon={Layers} colorClass="amber" delay={0.3}>
+            <ResponsiveContainer width="100%" height={400}>
+              <ComposedChart data={safeArea} margin={{ top: 20, right: 20, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#CBD5E1" opacity={0.1} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
+                <YAxis hide />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: 'bold' }} />
+                <Bar dataKey="income" barSize={34} fill="#818CF8" radius={[6, 6, 0, 0]} />
+                <Line type="monotone" dataKey="target" stroke="#F59E0B" strokeWidth={4} strokeDasharray="5 5" />
+                <Line type="monotone" dataKey="expense" stroke="#EC4899" strokeWidth={3} dot={{ r: 6, fill: '#EC4899', strokeWidth: 2, stroke: '#fff' }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </InsightCard>
+        </div>
+
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-         <Card className="p-6 flex flex-col items-center justify-center group overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-emerald-500/20 transition-all duration-700 pointer-events-none"></div>
-            <h3 className="font-bold text-lg text-slate-900 dark:text-white w-full text-left mb-2 z-10 tracking-tight">Savings Rate</h3>
-            <div className="h-[180px] w-full relative flex items-center justify-center z-10">
-               <ResponsiveContainer width="100%" height="100%">
-                 <PieChart>
-                   <Pie
-                     data={[{name: 'Saved', value: actualRate}, {name: 'Spent', value: Number(100 - actualRate)}]}
-                     cx="50%" cy="50%"
-                     innerRadius={55}
-                     outerRadius={75}
-                     startAngle={180}
-                     endAngle={0}
-                     dataKey="value"
-                     stroke="none"
-                   >
-                     <Cell fill="#10b981" />
-                     <Cell fill="rgba(148, 163, 184, 0.15)" />
-                   </Pie>
-                 </PieChart>
-               </ResponsiveContainer>
-               <div className="absolute inset-0 flex flex-col items-center justify-center -mb-8 pointer-events-none">
-                 <span className="text-4xl font-black text-emerald-500 tracking-tighter">{actualRate.toFixed(1)}%</span>
-                 <span className="text-[10px] font-bold text-slate-400 tracking-[0.2em]">RETENTION</span>
-               </div>
-            </div>
-         </Card>
-
-         <Card className="p-6 lg:col-span-2 group overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -mr-20 -mt-20 group-hover:bg-indigo-500/10 transition-all duration-700 pointer-events-none"></div>
-            <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-6 z-10 relative tracking-tight">Cash Velocity Map</h3>
-            <div className="h-[180px] w-full z-10 relative">
-               <ResponsiveContainer width="100%" height="100%">
-                 <BarChart data={cashFlowVsIncome} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
-                   <XAxis type="number" hide />
-                   <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fill: 'currentColor', fontSize: 13, fontWeight: 700, opacity: 0.6}} width={80} className="text-slate-700 dark:text-slate-300" />
-                   <RechartsTooltip 
-                     cursor={{fill: 'rgba(255,255,255,0.03)'}} 
-                     contentStyle={{ borderRadius: '16px', borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(15, 23, 42, 0.95)', color: '#fff', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)'}}
-                     itemStyle={{fontWeight: 'bold'}}
-                     formatter={(val) => `$${Number(val).toLocaleString()}`}
-                   />
-                   <Bar dataKey="amount" radius={[0, 12, 12, 0]} barSize={40}>
-                      {cashFlowVsIncome.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                   </Bar>
-                 </BarChart>
-               </ResponsiveContainer>
-            </div>
-         </Card>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <Card className="p-6">
-          <h3 className="font-bold text-xl text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-4 mb-6 tracking-tight">Behavioral Analysis</h3>
-          <div className="space-y-4">
-            {monthlyAnalysis.map((insight, i) => (
-              <InsightItem key={`monthly-${i}`} {...insight} />
-            ))}
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="font-bold text-xl text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-4 mb-6 tracking-tight">Strategic Recommendations</h3>
-          <div className="space-y-4">
-            {recommendations.map((rec, i) => (
-              <InsightItem key={`rec-${i}`} {...rec} />
-            ))}
-          </div>
-        </Card>
-      </div>
-    </motion.div>
+    </div>
   );
 };

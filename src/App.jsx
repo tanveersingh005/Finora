@@ -4,7 +4,7 @@ import { store } from './store/store';
 import { Layout } from './layout/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
-
+import { Insights } from './pages/Insights';
 import { Landing } from './pages/Landing';
 import { Toaster } from 'sonner';
 
@@ -26,7 +26,7 @@ function App() {
           <Route element={<Layout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/transactions" element={<Transactions />} />
-
+            <Route path="/insights" element={<Insights />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
