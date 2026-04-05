@@ -1,4 +1,4 @@
-# Finora - Intelligent Cash Flow Hub
+# Finora - Your Finance Dashboard
 
 ![Finora Architecture Hero](./public/main.png)
 
