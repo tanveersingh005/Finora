@@ -1,6 +1,6 @@
 # Finora - Intelligent Cash Flow Hub
 
-![Finora Architecture Hero](./public/hero-screenshot.png)
+![Finora Architecture Hero](./public/main.png)
 
 ## 📖 Overview
 **Finora** is an enterprise-grade, high-performance financial dashboard conceived as a masterclass in modern frontend architecture. It moves beyond standard analytic dashboards by deeply integrating gamification, real-time mathematical visualizations, and flawless Role-Based Access Control (RBAC).
